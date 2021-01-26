@@ -79,3 +79,233 @@ uint8_t olc6502::ZP0() {
 	addr_abs &= 0x00FF;
 	return 0;
 }
+
+uint8_t olc6502::ZPX() {
+	addr_abs = (read(pc) + x);
+	pc++;
+	addr_abs &= 0x00FF;
+	return 0;
+}
+
+uint8_t olc6502::ZPY() {
+	addr_abs = (read(pc) + y);
+	pc++;
+	addr_abs &= 0x00FF;
+	return 0;
+}
+
+uint8_t olc6502::ABS() {
+	uint16_t lo = read(pc);
+	pc++;
+	uint16_t hi = read(pc);
+	pc++;
+
+	addr_abs = (hi << 8) | lo;
+	return 0;
+}
+
+uint8_t olc6502::ABX() {
+	uint16_t lo = read(pc);
+	pc++;
+	uint16_t hi = read(pc);
+	pc++;
+	addr_abs = (hi << 8) | lo;
+	addr_abs += x;
+	if ((addr_abs & 0xFF00) != (hi << 8)) {
+		return 1;
+	}
+	else {
+		return 0;
+	}
+}
+
+uint8_t olc6502::ABY() {
+	uint16_t lo = read(pc);
+	pc++;
+	uint16_t hi = read(pc);
+	pc++;
+	addr_abs = (hi << 8) | lo;
+	addr_abs += y;
+	if ((addr_abs & 0xFF00) != (hi << 8)) {
+		return 1;
+	}
+	else {
+		return 0;
+	}
+}
+
+uint8_t olc6502::IND() {
+	uint16_t ptr_lo = read(pc);
+	pc++;
+	uint16_t ptr_hi = read(pc);
+	pc++;
+	uint16_t ptr = (ptr_hi << 8) | ptr_lo;
+	
+	if (ptr_lo == 0x00FF) {
+		addr_abs = (read(ptr & 0xFF00) << 8) | read(ptr + 0);
+	}
+	else {
+		addr_abs = (read(ptr + 1) << 8) | read(ptr + 0);
+	}
+
+	return 0;
+}
+
+uint8_t olc6502::IZX() {
+	uint16_t t = read(pc);
+	pc++;
+	uint16_t lo = read((uint16_t)(t + (uint16_t)x) & 0x00FF);
+	uint16_t hi = read((uint16_t)(t + (uint16_t)x + 1) & 0x00FF);
+	addr_abs = (hi << 8) | lo;
+	return 0;
+}
+
+uint8_t olc6502::IZY() {
+	uint16_t t = read(pc);
+	pc++;
+	uint16_t lo = read(t & 0x00FF);
+	uint16_t hi = read((t + 1) & 0x00FF);
+	addr_abs = (hi << 8) | lo;
+	addr_abs += y;
+	if ((addr_abs & 0x00FF) != (hi << 8)) {
+		return 1;
+	}
+	else {
+		return 0;
+	}
+}
+
+uint8_t olc6502::REL() {
+	addr_rel = read(pc);
+	pc++;
+	if (addr_rel & 0x80) {
+		addr_rel |= 0xFF00;
+	}
+	return 0;
+}
+
+// Instructions of CPU
+
+uint8_t olc6502::fetch() {
+	if (!(lookup[opcode].addrmode == &olc6502::IMP)) {
+		fetched = read(addr_abs);
+	}
+	return fetched;
+}
+
+uint8_t olc6502::AND() {
+	fetch();
+	a = a & fetched;
+	SetFlag(Z, a == 0x00);
+	SetFlag(N, a & 0x80);
+	return 1;
+}
+
+uint8_t olc6502::BCS() {
+	if (GetFlag(C) == 1) {
+		cycles++;
+		addr_abs = pc + addr_rel;
+		if ((addr_abs & 0xFF00) != (pc & 0xFF00)) {
+			cycles++;
+		}
+		pc = addr_abs;
+	}
+	return 0;
+}
+
+uint8_t olc6502::BEQ() {
+	if (GetFlag(Z) == 1) {
+		cycles++;
+		addr_abs = pc + addr_rel;
+		if ((addr_abs & 0xFF00) != (pc & 0xFF00)) {
+			cycles++;
+		}
+		pc = addr_abs;
+	}
+	return 0;
+}
+
+uint8_t olc6502::BMI() {
+	if (GetFlag(N) == 1) {
+		cycles++;
+		addr_abs = pc + addr_rel;
+		if ((addr_abs & 0xFF00) != (pc & 0xFF00)) {
+			cycles++;
+		}
+		pc = addr_abs;
+	}
+	return 0;
+}
+
+uint8_t	olc6502::BNE() {
+	if (GetFlag(Z) == 0) {
+		cycles++;
+		addr_abs = pc + addr_rel;
+		if ((addr_abs & 0xFF00) != (pc & 0xFF00)) {
+			cycles++;
+		}
+		pc = addr_abs;
+	}
+	return 0;
+}
+
+uint8_t olc6502::BPL() {
+	if (GetFlag(N) == 0) {
+		cycles++;
+		addr_abs = pc + addr_rel;
+		if ((addr_abs & 0xFF00) != (pc & 0xFF00)) {
+			cycles++;
+		}
+		pc = addr_abs;
+	}
+	return 0;
+}
+
+uint8_t olc6502::BVC() {
+	if (GetFlag(V) == 0) {
+		cycles++;
+		addr_abs = pc + addr_rel;
+		if ((addr_abs & 0xFF00) != (pc & 0xFF00)) {
+			cycles++;
+		}
+		pc = addr_abs;
+	}
+	return 0;
+}
+
+uint8_t olc6502::BVS() {
+	if (GetFlag(V) == 0) {
+		cycles++;
+		addr_abs = pc + addr_rel;
+		if ((addr_abs & 0xFF00) != (pc & 0xFF00)){
+			cycles++;
+		}
+		pc = addr_abs;
+	}
+	return 0;
+}
+
+uint8_t olc6502::CLC() {
+	SetFlag(C, false);
+	return 0;
+}
+
+uint8_t olc6502::CLD() {
+	SetFlag(D, false);
+	return 0;
+}
+
+uint8_t olc6502::ADC() {
+	fetch();
+	uint16_t temp = (uint16_t)a + (uint16_t)fetched + (uint16_t)GetFlag(C);
+	SetFlag(C, temp > 255);
+	SetFlag(Z, (temp & 0x00FF) == 0);
+	SetFlag(N, temp & 0x80);
+	SetFlag(V, (~((uint16_t)a ^ (uint16_t)fetched) & ((uint16_t)a ^ (uint16_t)temp)) & 0x0080);
+	a = temp & 0x00FF;
+	return 1;
+}
+
+uint8_t olc6502::SBC() {
+
+}
