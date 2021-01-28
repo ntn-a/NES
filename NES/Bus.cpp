@@ -1,9 +1,9 @@
 #include "Bus.h"
 
 Bus::Bus() {
-	for (auto& i : ram) i = 0x00; // Clear RAM.
-
 	cpu.ConnectBus(this); // Cpu to Bus.
+
+	for (auto& i : ram) i = 0x00; // Clear RAM.
 }
 
 Bus::~Bus() {

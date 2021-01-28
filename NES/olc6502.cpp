@@ -307,5 +307,103 @@ uint8_t olc6502::ADC() {
 }
 
 uint8_t olc6502::SBC() {
+	fetch();
 
+	uint16_t value = ((uint16_t)fetched) ^ 0x00FF;
+
+	uint16_t temp = (uint16_t)a + value + (uint16_t)GetFlag(C);
+	SetFlag(C, temp & 0xFF00);
+	SetFlag(Z, ((temp & 0x00FF) == 0));
+	SetFlag(V, (temp ^ (uint16_t)a) & (temp ^ value) & 0x0080);
+	SetFlag(N, temp & 0x0080);
+	a = temp & 0x00FF;
+}
+
+uint8_t olc6502::PHA() {
+	write(0x0100 + stkp, a);
+	stkp--;
+	return 0;
+}
+
+uint8_t olc6502::PLA() {
+	stkp++;
+	a = read(0x0100 + stkp);
+	SetFlag(Z, a == 0x00);
+	SetFlag(N, a & 0x80);
+	return 0;
+}
+
+void olc6502::reset() {
+	a = 0;
+	x = 0;
+	y = 0;
+	stkp = 0xFD;
+	status = 0x00 | U;
+
+	addr_abs = 0xFFFC;
+	uint16_t lo = read(addr_abs + 0);
+	uint16_t hi = read(addr_abs + 1);
+
+	pc = (hi << 8) | lo;
+
+	addr_rel = 0x0000;
+	addr_abs = 0x0000;
+	fetched = 0x00;
+
+	cycles = 8;
+}
+
+void olc6502::irq() {
+	if (GetFlag(I) == 0) {
+		write(0x0100 + stkp, (pc >> 8) & 0x00FF);
+		stkp--;
+		write(0x0100 + stkp, pc & 0x00FF);
+		stkp--;
+
+		SetFlag(B, 0);
+		SetFlag(U, 1);
+		SetFlag(I, 1);
+		write(0x0100 + stkp, status);
+		stkp--;
+
+		addr_abs = 0xFFFE;
+		uint16_t lo = read(addr_abs + 0);
+		uint16_t hi = read(addr_abs + 1);
+		pc = (hi << 8) | lo;
+
+		cycles = 7;
+	}
+}
+
+void olc6502::nmi() {
+	write(0x0100 + stkp, (pc >> 8) & 0x00FF);
+	stkp--;
+	write(0x0100 + stkp, pc & 0x00FF);
+	stkp--;
+
+	SetFlag(B, 0);
+	SetFlag(U, 1);
+	SetFlag(I, 1);
+	write(0x0100 + stkp, status);
+	stkp--;
+
+	addr_abs = 0xFFFA;
+	uint16_t lo = read(addr_abs + 0);
+	uint16_t hi = read(addr_abs + 1);
+	pc = (hi << 8) | lo;
+
+	cycles = 8;
+}
+
+uint8_t olc6502::RTI() {
+	stkp++;
+	status = read(0x0100 + stkp);
+	status &= ~B;
+	status &= ~U;
+
+	stkp++;
+	pc = (uint16_t)read(0x0100 + stkp);
+	stkp++;
+	pc |= (uint16_t)read(0x0100 + stkp) << 8;
+	return 0;
 }
